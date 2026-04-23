@@ -4,10 +4,12 @@ import 'dart:math';
 
 import 'package:flutter/foundation.dart';
 import 'package:mqtt_client/mqtt_client.dart';
-import 'package:mqtt_client/mqtt_server_client.dart';
 
 import 'app_config.dart';
 import 'device_state.dart';
+import 'mqtt_platform.dart'
+    if (dart.library.io) 'mqtt_platform_io.dart'
+    if (dart.library.js_interop) 'mqtt_platform_web.dart';
 
 enum BrokerStatus { disconnected, connecting, connected }
 
@@ -40,8 +42,7 @@ class MqttService {
   final _clientId =
       'flutter-${DateTime.now().millisecondsSinceEpoch}-${Random().nextInt(9999)}';
 
-  late final MqttServerClient _client =
-      MqttServerClient.withPort(AppConfig.mqttHost, _clientId, AppConfig.mqttPort);
+  late final MqttClient _client = createMqttClient(_clientId);
 
   final brokerStatus = ValueNotifier<BrokerStatus>(BrokerStatus.disconnected);
   final deviceOnline = ValueNotifier<bool>(false);

@@ -2,7 +2,9 @@
 ///
 /// Values must match `esp32/src/config.h` on the firmware side.
 class AppConfig {
-  static const String mqttHost = 'broker.hivemq.com';
+  // Some mobile carriers hijack broker.hivemq.com's DNS to 127.0.0.1;
+  // fall back to a direct AWS IP (known A record for broker.hivemq.com).
+  static const String mqttHost = '35.157.221.203';
   static const int mqttPort = 1883;
 
   /// Must be identical to `DEVICE_ID` in the firmware.
