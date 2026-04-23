@@ -2,3 +2,6 @@
 .vscode/
 .DS_Store
 *.log
+
+# Local config with credentials - copy config.example.h and fill in
+src/config.h
