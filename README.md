@@ -88,6 +88,7 @@ ESP32 DevKit V1 o. ä., gängige Wiring:
 
 ```bash
 cd esp32
+cp src/config.example.h src/config.h   # einmalig – config.h ist gitignored
 # WiFi-Zugangsdaten und optional DEVICE_ID in src/config.h eintragen
 pio run -t upload      # flashen
 pio device monitor     # serieller Output
