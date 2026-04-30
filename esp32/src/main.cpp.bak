@@ -107,33 +107,18 @@ static void applyLed() {
 #endif
 }
 
-// Serialize the current state to a tiny stack buffer. Returned length only
-// — caller passes its own buffer in.
-static size_t serializeState(char* buf, size_t bufSize) {
+static void publishState() {
     JsonDocument doc;
     doc["power"]      = state.power;
     doc["brightness"] = state.brightness;
     doc["r"]          = state.r;
     doc["g"]          = state.g;
     doc["b"]          = state.b;
-    return serializeJson(doc, buf, bufSize);
-}
 
-static void publishState() {
     char buf[128];
-    size_t n = serializeState(buf, sizeof(buf));
+    size_t n = serializeJson(doc, buf, sizeof(buf));
     mqtt.publish(TOPIC_STATE.c_str(), (const uint8_t*)buf, n, true); // retained
     Serial.printf("[MQTT] state -> %s\n", buf);
-}
-
-// Mirror current state into the retained cmd topic. Called whenever the ESP
-// itself changes state (e.g. via the physical button), so the broker's
-// retained cmd reflects reality and an ESP reboot won't get overridden by
-// a stale cmd from the app.
-static void publishCmdMirror() {
-    char buf[128];
-    size_t n = serializeState(buf, sizeof(buf));
-    mqtt.publish(TOPIC_CMD.c_str(), (const uint8_t*)buf, n, true);   // retained
 }
 
 static void handleCommand(const String& payload) {
@@ -231,12 +216,7 @@ static void pollButton() {
         if (stableButtonState == LOW) {     // pressed (INPUT_PULLUP)
             state.power = !state.power;
             applyLed();
-            if (mqtt.connected()) {
-                publishState();
-                // Keep the retained cmd in sync with reality so a future
-                // ESP reboot doesn't get overridden by a stale app cmd.
-                publishCmdMirror();
-            }
+            if (mqtt.connected()) publishState();
             Serial.printf("[BTN] toggle -> %s\n", state.power ? "ON" : "OFF");
         }
     }

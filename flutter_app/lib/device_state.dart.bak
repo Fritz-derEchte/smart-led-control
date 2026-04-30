@@ -36,16 +36,6 @@ class LedState {
     );
   }
 
-  /// Encodes the full state as JSON. Used when publishing a retained command
-  /// so the ESP32 can recover the desired state after a reconnect.
-  String toJson() => jsonEncode({
-        'power': power,
-        'brightness': brightness,
-        'r': r,
-        'g': g,
-        'b': b,
-      });
-
   static LedState? tryParse(String payload) {
     try {
       final map = jsonDecode(payload) as Map<String, dynamic>;

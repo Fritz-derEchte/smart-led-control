@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:convert';
 import 'dart:math';
 
 import 'package:flutter/foundation.dart';
@@ -48,12 +49,6 @@ class MqttService {
   final ledState = ValueNotifier<LedState>(const LedState.initial());
   final sensor = ValueNotifier<SensorReading?>(null);
 
-  /// What the user wants the LED to be — kept locally so we can publish a
-  /// full snapshot (not a partial diff) as a retained cmd. That way the ESP
-  /// recovers the latest desired state on reconnect, even if the app went
-  /// offline in between.
-  LedState _desired = const LedState.initial();
-
   StreamSubscription<List<MqttReceivedMessage<MqttMessage>>>? _sub;
 
   Future<void> connect() async {
@@ -82,16 +77,6 @@ class MqttService {
     _client.subscribe(AppConfig.topicSensor, MqttQos.atLeastOnce);
     _client.subscribe(AppConfig.topicOnline, MqttQos.atLeastOnce);
 
-    // Mirror the LWT we registered: announce ourselves as online (retained),
-    // so a fresh client can tell at a glance whether an app is around.
-    final onlineMsg = MqttClientPayloadBuilder()..addString('online');
-    _client.publishMessage(
-      '${AppConfig.topicOnline}-app',
-      MqttQos.atLeastOnce,
-      onlineMsg.payload!,
-      retain: true,
-    );
-
     _sub ??= _client.updates!.listen(_onMessages);
   }
 
@@ -109,13 +94,7 @@ class MqttService {
 
       if (topic == AppConfig.topicState) {
         final s = LedState.tryParse(payload);
-        if (s != null) {
-          ledState.value = s;
-          // Keep our desired-state mirror in sync with what the device
-          // actually reports — the device's view wins for the baseline,
-          // user actions then mutate from here.
-          _desired = s;
-        }
+        if (s != null) ledState.value = s;
       } else if (topic == AppConfig.topicSensor) {
         final s = SensorReading.tryParse(payload);
         if (s != null) sensor.value = s;
@@ -127,35 +106,20 @@ class MqttService {
 
   // ---------- commands ----------
 
-  /// Publishes the full desired state as a retained cmd. Retain=true means
-  /// the broker hands the latest snapshot to the ESP whenever it (re)subscribes,
-  /// so the LED ends up matching the user's last wish even if the device was
-  /// offline at the time the user touched the UI.
-  void _publishDesired() {
+  void _publish(Map<String, dynamic> partial) {
     if (brokerStatus.value != BrokerStatus.connected) return;
-    final builder = MqttClientPayloadBuilder()..addString(_desired.toJson());
+    final builder = MqttClientPayloadBuilder()..addString(jsonEncode(partial));
     _client.publishMessage(
       AppConfig.topicCmd,
       MqttQos.atLeastOnce,
       builder.payload!,
-      retain: true,
     );
   }
 
-  void setPower(bool on) {
-    _desired = _desired.copyWith(power: on);
-    _publishDesired();
-  }
-
-  void setBrightness(int value) {
-    _desired = _desired.copyWith(brightness: value.clamp(0, 255));
-    _publishDesired();
-  }
-
-  void setColor(int r, int g, int b) {
-    _desired = _desired.copyWith(r: r, g: g, b: b);
-    _publishDesired();
-  }
+  void setPower(bool on) => _publish({'power': on});
+  void setBrightness(int value) =>
+      _publish({'brightness': value.clamp(0, 255)});
+  void setColor(int r, int g, int b) => _publish({'r': r, 'g': g, 'b': b});
 
   void dispose() {
     _sub?.cancel();
